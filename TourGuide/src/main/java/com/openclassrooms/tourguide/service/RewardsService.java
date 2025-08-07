@@ -1,7 +1,13 @@
 package com.openclassrooms.tourguide.service;
 
+import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import gpsUtil.GpsUtil;
@@ -14,6 +20,7 @@ import com.openclassrooms.tourguide.user.UserReward;
 
 @Service
 public class RewardsService {
+	private final Logger logger = LoggerFactory.getLogger(RewardsService.class);
     private static final double STATUTE_MILES_PER_NAUTICAL_MILE = 1.15077945;
 
 	// proximity in miles
@@ -39,18 +46,21 @@ public class RewardsService {
 	public void calculateRewards(User user) {
 		List<VisitedLocation> userLocations = user.getVisitedLocations();
 		List<Attraction> attractions = gpsUtil.getAttractions();
-		
-		for(VisitedLocation visitedLocation : userLocations) {
-			for(Attraction attraction : attractions) {
-				if(user.getUserRewards().stream().filter(r -> r.attraction.attractionName.equals(attraction.attractionName)).count() == 0) {
+
+			for(VisitedLocation visitedLocation : userLocations) {
+				CopyOnWriteArrayList<UserReward> userRewards = new CopyOnWriteArrayList<>(user.getUserRewards());
+				for(Attraction attraction : attractions) {
 					if(nearAttraction(visitedLocation, attraction)) {
-						user.addUserReward(new UserReward(visitedLocation, attraction, getRewardPoints(attraction, user)));
+						if(userRewards.stream().filter(r -> r.attraction.attractionName.equals(attraction.attractionName)).count() == 0) {
+							userRewards.addIfAbsent(new UserReward(visitedLocation, attraction, getRewardPoints(attraction, user)));
+						}
 					}
 				}
+
+				user.setUserRewards( userRewards.stream().toList());
 			}
-		}
 	}
-	
+
 	public boolean isWithinAttractionProximity(Attraction attraction, Location location) {
 		return getDistance(attraction, location) > attractionProximityRange ? false : true;
 	}

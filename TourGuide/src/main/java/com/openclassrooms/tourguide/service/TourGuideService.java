@@ -47,9 +47,9 @@ public class TourGuideService {
 
 		if (testMode) {
 			logger.info("TestMode enabled");
-			logger.debug("Initializing users");
+			logger.info("Initializing users");
 			initializeInternalUsers();
-			logger.debug("Finished initializing users");
+			logger.info("Finished initializing users");
 		}
 		tracker = new Tracker(this);
 		addShutDownHook();
