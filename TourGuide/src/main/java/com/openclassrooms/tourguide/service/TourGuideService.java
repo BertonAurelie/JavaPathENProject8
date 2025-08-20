@@ -87,6 +87,10 @@ public class TourGuideService {
         return visitedLocation;
     }
 
+    public void trackUsersLocation(List<User> users){
+        users.parallelStream().forEach(this::trackUserLocation);
+    }
+
 
     public List<AttractionDistanceInfo> getNearByAttractions(VisitedLocation visitedLocation, User user) {
         //ajoute dans une liste l'attraction et sa distance avec l'utilisateur
@@ -101,6 +105,7 @@ public class TourGuideService {
 
         //liste qui ne contient que les 5 premiers éléments de la première liste
         List<AttractionProximity> resizeList = new ArrayList<>();
+        logger.info("debu33g");
         int i = 0;
         for (AttractionProximity attractionProximity : nearbyAttractions) {
             if (i < 5) {

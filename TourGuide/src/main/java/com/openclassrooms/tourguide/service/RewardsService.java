@@ -11,8 +11,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import rewardCentral.RewardCentral;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Set;
+import java.util.concurrent.*;
 
 @Service
 public class RewardsService {
@@ -25,6 +27,7 @@ public class RewardsService {
     private int attractionProximityRange = 200;
     private final GpsUtil gpsUtil;
     private final RewardCentral rewardsCentral;
+    private final ExecutorService executorService = Executors.newFixedThreadPool(10);
 
     public RewardsService(GpsUtil gpsUtil, RewardCentral rewardCentral) {
         this.gpsUtil = gpsUtil;
@@ -40,21 +43,34 @@ public class RewardsService {
     }
 
     public void calculateRewards(User user) {
-        List<VisitedLocation> userLocations = user.getVisitedLocations();
         List<Attraction> attractions = gpsUtil.getAttractions();
+        List<VisitedLocation> visitedLocations = new CopyOnWriteArrayList<>(user.getVisitedLocations());
+        ExecutorService pool = Executors.newFixedThreadPool(100);
 
-        for (VisitedLocation visitedLocation : userLocations) {
-            CopyOnWriteArrayList<UserReward> userRewards = new CopyOnWriteArrayList<>(user.getUserRewards());
+        Set<String> seenAttractions = ConcurrentHashMap.newKeySet();
+
+        List<CompletableFuture<UserReward>> futures = new ArrayList<>();
+
+        for (VisitedLocation visitedLocation : visitedLocations) {
             for (Attraction attraction : attractions) {
                 if (nearAttraction(visitedLocation, attraction)) {
-                    if (userRewards.stream().filter(r -> r.attraction.attractionName.equals(attraction.attractionName)).count() == 0) {
-                        userRewards.addIfAbsent(new UserReward(visitedLocation, attraction, getRewardPoints(attraction, user)));
-                    }
+                    String key = attraction.attractionName;
+                    if (!seenAttractions.add(key)) continue;
+
+                    futures.add(CompletableFuture.supplyAsync(() ->
+                            new UserReward(visitedLocation, attraction, getRewardPoints(attraction, user)), pool));
                 }
             }
-
-            user.setUserRewards(userRewards.stream().toList());
         }
+
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        List<UserReward> rewards = futures.stream().map(CompletableFuture::join).toList();
+
+        user.setUserRewards(rewards);
+    }
+
+    public void calculateRewardsOfUsers(List<User> users) {
+        users.parallelStream().forEach(this::calculateRewards);
     }
 
     public boolean isWithinAttractionProximity(Attraction attraction, Location location) {
