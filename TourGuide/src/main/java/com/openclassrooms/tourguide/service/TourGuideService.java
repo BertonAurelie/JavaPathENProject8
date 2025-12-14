@@ -87,7 +87,7 @@ public class TourGuideService {
         return visitedLocation;
     }
 
-    public void trackUsersLocation(List<User> users){
+    public void trackUsersLocation(List<User> users) {
         users.parallelStream().forEach(this::trackUserLocation);
     }
 

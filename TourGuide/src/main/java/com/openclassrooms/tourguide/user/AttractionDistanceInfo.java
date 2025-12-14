@@ -1,7 +1,6 @@
 package com.openclassrooms.tourguide.user;
 
 import gpsUtil.location.Location;
-import rewardCentral.RewardCentral;
 
 public class AttractionDistanceInfo {
     private String attractionName;
