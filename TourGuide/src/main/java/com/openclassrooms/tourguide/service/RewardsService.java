@@ -6,6 +6,7 @@ import gpsUtil.GpsUtil;
 import gpsUtil.location.Attraction;
 import gpsUtil.location.Location;
 import gpsUtil.location.VisitedLocation;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ public class RewardsService {
     private int attractionProximityRange = 200;
     private final GpsUtil gpsUtil;
     private final RewardCentral rewardsCentral;
-    private final ExecutorService executorService = Executors.newFixedThreadPool(10);
+    private final ExecutorService executorService = Executors.newFixedThreadPool(100);
 
     public RewardsService(GpsUtil gpsUtil, RewardCentral rewardCentral) {
         this.gpsUtil = gpsUtil;
@@ -45,7 +46,6 @@ public class RewardsService {
     public void calculateRewards(User user) {
         List<Attraction> attractions = gpsUtil.getAttractions();
         List<VisitedLocation> visitedLocations = new CopyOnWriteArrayList<>(user.getVisitedLocations());
-        ExecutorService pool = Executors.newFixedThreadPool(100);
 
         Set<String> seenAttractions = ConcurrentHashMap.newKeySet();
 
@@ -58,7 +58,7 @@ public class RewardsService {
                     if (!seenAttractions.add(key)) continue;
 
                     futures.add(CompletableFuture.supplyAsync(() ->
-                            new UserReward(visitedLocation, attraction, getRewardPoints(attraction, user)), pool));
+                            new UserReward(visitedLocation, attraction, getRewardPoints(attraction, user)), executorService));
                 }
             }
         }
@@ -67,6 +67,11 @@ public class RewardsService {
         List<UserReward> rewards = futures.stream().map(CompletableFuture::join).toList();
 
         user.setUserRewards(rewards);
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        executorService.shutdown();
     }
 
     public void calculateRewardsOfUsers(List<User> users) {
